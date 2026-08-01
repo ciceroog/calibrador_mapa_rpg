@@ -200,6 +200,10 @@
 
     <div class="bloco">
       <h2>1. Modo de calibração</h2>
+      <button class="bloco-btn" id="btnDetectar" style="margin-top:0;">🪄 Detectar automaticamente (sem marcar nada)</button>
+      <div id="deteccaoInfo" class="mono" style="font-size:11px; color:var(--ink-soft); margin:6px 0; white-space:pre-line;"></div>
+      <button class="bloco-btn" id="btnUsarSugestao" disabled style="background:var(--green-ok); color:#FBF6E8; border-color:var(--green-ok);">✅ Usar esta sugestão</button>
+      <hr style="border:none; border-top:1px solid var(--border); margin:10px 0;">
       <label class="radio-linha"><input type="radio" name="modo" value="quadrado" checked> Quadrado (clique e arraste)</label>
       <label class="radio-linha"><input type="radio" name="modo" value="dois_pontos"> Quadrado por 2 pontos (2 cliques diagonais)</label>
       <label class="radio-linha"><input type="radio" name="modo" value="quadrilatero"> Quadrilátero livre (corrige perspectiva) <span id="cvStatus" class="mono" style="font-size:10px;"></span></label>
@@ -328,6 +332,9 @@ document.getElementById('fileInput').addEventListener('change', (e)=>{
 
     tilePx = null; infoCorte = null; offsetX = 0; offsetY = 0;
     alinhamentoAtivo = false; pontosOriginais = []; zoom = 1;
+    tileEstimadoAuto = null; sugestaoArea = null;
+    document.getElementById('deteccaoInfo').textContent = '';
+    document.getElementById('btnUsarSugestao').disabled = true;
     document.getElementById('btnAlinhamento').textContent = '🎯 Ativar alinhamento (arraste a grade)';
     document.getElementById('btnAlinhamento').disabled = true;
     document.getElementById('btnPreview').disabled = true;
@@ -363,6 +370,7 @@ function exibirNoCanvas(sourceCanvas){
   ctx.drawImage(sourceCanvas, 0, 0, sourceCanvas.width, sourceCanvas.height, 0, 0, dispW, dispH);
   document.getElementById('zoomLabel').textContent = Math.round(zoom*100)+'%';
   redesenharMarcacoes();
+  redesenharSugestao();
 }
 
 function aplicarZoom(novoZoom){
@@ -593,6 +601,157 @@ function mostrarResultadoCalibracao(){
   atualizarInfoCorte();
   statusMsg('Calibração concluída. Ajuste o alinhamento/corte e exporte.');
 }
+
+// ══════════════════════════════════════════════════════════════════
+// DETECÇÃO AUTOMÁTICA DE TILE (sem IA — autocorrelação sobre bordas)
+// ══════════════════════════════════════════════════════════════════
+let tileEstimadoAuto = null;
+let sugestaoArea = null; // {x, y, tam} em coords da imagem original
+
+function periodoDominante(perfil, minPeriodo=8, maxPeriodo=null){
+  const n = perfil.length;
+  if(maxPeriodo===null) maxPeriodo = Math.max(minPeriodo+1, Math.floor(n/3));
+  maxPeriodo = Math.min(maxPeriodo, n-1);
+  let soma=0; for(let i=0;i<n;i++) soma+=perfil[i];
+  const media = soma/n;
+  const p = new Float64Array(n);
+  for(let i=0;i<n;i++) p[i]=perfil[i]-media;
+
+  const vals = [];
+  let melhorLag = minPeriodo, melhorVal = -Infinity;
+  for(let lag=minPeriodo; lag<=maxPeriodo; lag++){
+    let corr=0;
+    for(let i=0;i<n-lag;i++) corr += p[i]*p[i+lag];
+    vals.push(corr);
+    if(corr>melhorVal){ melhorVal=corr; melhorLag=lag; }
+  }
+  const mediaV = vals.reduce((a,b)=>a+b,0)/vals.length;
+  const variancia = vals.reduce((a,b)=>a+(b-mediaV)*(b-mediaV),0)/vals.length;
+  const desvio = Math.sqrt(variancia);
+  const confianca = melhorVal/(desvio+1e-6);
+  return {lag: melhorLag, confianca};
+}
+
+function mapaBordas(matCinza){
+  const gx = new cv.Mat(), gy = new cv.Mat(), mag = new cv.Mat();
+  cv.Sobel(matCinza, gx, cv.CV_32F, 1, 0, 3);
+  cv.Sobel(matCinza, gy, cv.CV_32F, 0, 1, 3);
+  cv.magnitude(gx, gy, mag);
+  gx.delete(); gy.delete();
+  return mag;
+}
+
+function perfisXY(magMat){
+  const rows = magMat.rows, cols = magMat.cols;
+  const data = magMat.data32F;
+  const perfilX = new Float64Array(cols);
+  const perfilY = new Float64Array(rows);
+  for(let r=0;r<rows;r++){
+    const off = r*cols;
+    let somaLinha=0;
+    for(let c=0;c<cols;c++){
+      const v = data[off+c];
+      perfilX[c]+=v; somaLinha+=v;
+    }
+    perfilY[r]=somaLinha;
+  }
+  return {perfilX, perfilY};
+}
+
+function detectarTileAutomatico(){
+  const src = cv.imread(canvasOriginal);
+  const gray = new cv.Mat();
+  cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+  const mag = mapaBordas(gray);
+  const {perfilX, perfilY} = perfisXY(mag);
+  src.delete(); gray.delete(); mag.delete();
+
+  const minP = 8;
+  const rx = periodoDominante(perfilX, minP, Math.max(minP+1, Math.floor(perfilX.length/3)));
+  const ry = periodoDominante(perfilY, minP, Math.max(minP+1, Math.floor(perfilY.length/3)));
+  const tileEstimado = (rx.lag + ry.lag)/2;
+  const confianca = Math.min(rx.confianca, ry.confianca);
+  return {tileEstimado, confianca};
+}
+
+function pontuarJanela(grayMat, x0, y0, tam, tileEstimado){
+  const rect = new cv.Rect(x0, y0, tam, tam);
+  const sub = grayMat.roi(rect);
+  const mag = mapaBordas(sub);
+  const {perfilX, perfilY} = perfisXY(mag);
+  const minP = Math.max(4, Math.floor(tileEstimado*0.5));
+  const rx = periodoDominante(perfilX, minP);
+  const ry = periodoDominante(perfilY, minP);
+  sub.delete(); mag.delete();
+  return Math.min(rx.confianca, ry.confianca);
+}
+
+function sugerirAreaLimpa(tileEstimado, nTilesJanela=8){
+  const src = cv.imread(canvasOriginal);
+  const gray = new cv.Mat();
+  cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+  const largura = gray.cols, altura = gray.rows;
+  let tam = Math.round(tileEstimado*nTilesJanela);
+  tam = Math.max(40, Math.min(tam, Math.min(largura,altura)));
+
+  const passos = 4;
+  const maxX = Math.max(0, largura-tam), maxY = Math.max(0, altura-tam);
+  let melhorScore=-1, melhorX=0, melhorY=0;
+  for(let gy=0; gy<passos; gy++){
+    for(let gx=0; gx<passos; gx++){
+      const x0 = maxX>0 ? Math.round(gx*maxX/(passos-1)) : 0;
+      const y0 = maxY>0 ? Math.round(gy*maxY/(passos-1)) : 0;
+      const score = pontuarJanela(gray, x0, y0, tam, tileEstimado);
+      if(score>melhorScore){ melhorScore=score; melhorX=x0; melhorY=y0; }
+    }
+  }
+  src.delete(); gray.delete();
+  return {x:melhorX, y:melhorY, tam};
+}
+
+function redesenharSugestao(){
+  if(!sugestaoArea) return;
+  const p0 = originalParaCanvas(sugestaoArea.x, sugestaoArea.y);
+  const p1 = originalParaCanvas(sugestaoArea.x+sugestaoArea.tam, sugestaoArea.y+sugestaoArea.tam);
+  ctx.save();
+  ctx.strokeStyle = '#2563EB'; ctx.lineWidth = 2; ctx.setLineDash([6,3]);
+  ctx.strokeRect(p0.x, p0.y, p1.x-p0.x, p1.y-p0.y);
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#2563EB'; ctx.font = 'bold 12px Inter, system-ui, sans-serif';
+  ctx.fillText('área sugerida', (p0.x+p1.x)/2-30, p0.y-6);
+  ctx.restore();
+}
+
+document.getElementById('btnDetectar').onclick = ()=>{
+  if(larguraOrig===0){ alert('Abra uma imagem primeiro.'); return; }
+  if(!cvPronto){ alert('OpenCV ainda está carregando, tente novamente em instantes.'); return; }
+  document.getElementById('deteccaoInfo').textContent = 'Analisando periodicidade do grid...';
+  document.getElementById('btnUsarSugestao').disabled = true;
+
+  setTimeout(()=>{
+    try{
+      const {tileEstimado, confianca} = detectarTileAutomatico();
+      const area = sugerirAreaLimpa(tileEstimado);
+      tileEstimadoAuto = tileEstimado;
+      sugestaoArea = area;
+      const nivel = confianca>4 ? 'alta' : (confianca>2 ? 'média' : 'baixa');
+      document.getElementById('deteccaoInfo').textContent =
+        `Tile estimado: ~${tileEstimado.toFixed(1)}px (confiança: ${nivel})\nÁrea sugerida marcada em azul no mapa.`;
+      document.getElementById('btnUsarSugestao').disabled = false;
+      exibirNoCanvas(imagemBaseAtual || canvasCorrigida);
+      statusMsg("Detecção automática concluída — confira a área azul sugerida ou clique em 'Usar esta sugestão'.");
+    } catch(e){
+      document.getElementById('deteccaoInfo').textContent = '';
+      alert('Falha na detecção automática: '+e.message);
+    }
+  }, 30);
+};
+
+document.getElementById('btnUsarSugestao').onclick = ()=>{
+  if(tileEstimadoAuto===null) return;
+  finalizarCalibracaoQuadrado(tileEstimadoAuto);
+  statusMsg(`Usando estimativa automática: ${tileEstimadoAuto.toFixed(2)}px por tile. Refine com o modo 'Reta' se quiser mais precisão.`);
+};
 
 // ══════════════════════════════════════════════════════════════════
 // CÁLCULO DE CORTE (espelha a lógica do programa Python)
