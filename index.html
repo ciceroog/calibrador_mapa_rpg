@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calibrador de Mapas de RPG</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #ECE4D0;
+    --panel: #FBF6E8;
+    --panel-2: #F3EBD8;
+    --ink: #2B2620;
+    --ink-soft: #6E6350;
+    --accent: #9C3B2C;
+    --accent-soft: #F0D9CC;
+    --border: #CBB994;
+    --canvas-bg: #23211D;
+    --grid-line: #C9463A;
+    --green-ok: #3E7A52;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Inter', system-ui, sans-serif;
+    min-height: 100vh;
+  }
+  .mono{ font-family: 'JetBrains Mono', monospace; }
+
+  header{
+    padding: 22px 28px 16px;
+    border-bottom: 1px solid var(--border);
+    display:flex; align-items:baseline; gap: 14px; flex-wrap:wrap;
+  }
+  header h1{
+    font-family:'Cormorant Garamond', serif;
+    font-weight: 700;
+    font-size: 30px;
+    margin: 0;
+    letter-spacing: 0.3px;
+  }
+  header .subtitulo{
+    color: var(--ink-soft);
+    font-size: 13.5px;
+  }
+
+  main{
+    display:flex;
+    gap: 20px;
+    padding: 20px 28px 40px;
+    align-items:flex-start;
+    flex-wrap: wrap;
+  }
+
+  .painel-canvas{
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 14px;
+    flex: 1 1 640px;
+    min-width: 320px;
+  }
+  .painel-canvas .instrucao{
+    font-size: 13px;
+    color: var(--ink-soft);
+    margin-bottom: 10px;
+    min-height: 18px;
+  }
+  .barra-zoom{
+    display:flex; align-items:center; gap: 8px; margin-bottom: 10px; flex-wrap:wrap;
+  }
+  .barra-zoom span.dica{ color: var(--ink-soft); font-size: 12px; }
+  #zoomLabel{ font-family:'JetBrains Mono', monospace; font-size: 13px; width: 52px; text-align:center; }
+
+  .canvas-wrap{
+    background: var(--canvas-bg);
+    border: 1px solid #000;
+    border-radius: 2px;
+    overflow: auto;
+    max-width: 100%;
+    max-height: 70vh;
+    position: relative;
+  }
+  #viewCanvas{ display:block; cursor: crosshair; }
+
+  .painel-controles{
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    width: 340px;
+    flex: 0 0 340px;
+    max-height: 82vh;
+    overflow-y: auto;
+    padding: 4px 4px 16px;
+  }
+  .bloco{
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    margin: 10px;
+    padding: 10px 12px 12px;
+  }
+  .bloco h2{
+    font-family:'Cormorant Garamond', serif;
+    font-size: 17px;
+    font-weight: 700;
+    margin: 2px 0 8px;
+  }
+  .bloco p.ajuda{
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    line-height: 1.45;
+    margin: 4px 0 8px;
+  }
+  label.radio-linha, label.check-linha{
+    display:flex; align-items:flex-start; gap: 7px;
+    font-size: 13px;
+    margin: 5px 0;
+    cursor: pointer;
+  }
+  label.radio-linha input, label.check-linha input{ margin-top: 3px; }
+
+  button, select{
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 13px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--ink);
+    padding: 7px 10px;
+    cursor: pointer;
+  }
+  button:hover{ background: var(--accent-soft); }
+  button:disabled{ opacity:.45; cursor:not-allowed; }
+  button.primario{
+    background: var(--accent);
+    color: #FBF6E8;
+    border-color: var(--accent);
+    font-weight: 600;
+    width: 100%;
+    padding: 11px;
+    font-size: 14px;
+  }
+  button.primario:hover{ background: #82301F; }
+  button.bloco-btn{ width: 100%; margin-top: 4px; }
+  .linha{ display:flex; align-items:center; gap: 8px; margin: 6px 0; }
+  .linha label.rotulo{ width: 62px; font-size: 12.5px; color: var(--ink-soft); }
+  select{ flex:1; }
+
+  .cruz{ display:grid; grid-template-columns: repeat(3, 34px); grid-template-rows: repeat(3, 34px); gap:4px; justify-content:center; margin: 8px 0; }
+  .cruz button{ padding:0; }
+
+  #tileLabel{ color: var(--green-ok); font-weight:600; font-family:'JetBrains Mono', monospace; font-size:14px; }
+  #tilesDimInfo, #corteInfo, #offsetLabel{
+    font-family:'JetBrains Mono', monospace;
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    white-space: pre-line;
+    line-height: 1.5;
+  }
+  #statusMsg{ font-size:12px; color: var(--ink-soft); padding: 6px 10px; min-height: 16px; }
+
+  footer{
+    text-align:center; font-size: 11.5px; color: var(--ink-soft); padding: 12px 0 26px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🗺 Calibrador de Mapas de RPG</h1>
+  <span class="subtitulo">Padroniza mapas para Virtual Tabletop — grid exato em 50/70/100px por tile</span>
+</header>
+
+<main>
+  <div class="painel-canvas">
+    <div class="linha">
+      <input type="file" id="fileInput" accept=".jpg,.jpeg,.png,.webp">
+    </div>
+    <div class="instrucao" id="instrucao">Abra uma imagem para começar.</div>
+
+    <div class="barra-zoom">
+      <button id="btnZoomOut">🔍−</button>
+      <span id="zoomLabel" class="mono">100%</span>
+      <button id="btnZoomIn">🔍+</button>
+      <button id="btnZoomAjustar">Ajustar à tela</button>
+      <span class="dica">(zoom ajuda a marcar com precisão em imagens pequenas)</span>
+    </div>
+
+    <div class="canvas-wrap">
+      <canvas id="viewCanvas" width="900" height="620"></canvas>
+    </div>
+  </div>
+
+  <div class="painel-controles">
+
+    <div class="bloco">
+      <h2>1. Modo de calibração</h2>
+      <label class="radio-linha"><input type="radio" name="modo" value="quadrado" checked> Quadrado (clique e arraste)</label>
+      <label class="radio-linha"><input type="radio" name="modo" value="dois_pontos"> Quadrado por 2 pontos (2 cliques diagonais)</label>
+      <label class="radio-linha"><input type="radio" name="modo" value="quadrilatero"> Quadrilátero livre (corrige perspectiva) <span id="cvStatus" class="mono" style="font-size:10px;"></span></label>
+      <label class="radio-linha"><input type="radio" name="modo" value="reta"> Reta com N tiles (mais preciso p/ imagens grandes)</label>
+      <p class="ajuda">Reta: clique no início e no fim de uma sequência de várias células (ex: 10 tiles seguidos) e informe quantas células a reta abrange — reduz o erro acumulado em mapas grandes.</p>
+      <p class="ajuda">Quadrado: clique e arraste sobre 1 célula do grid.<br>2 pontos: clique no canto sup.-esq. e depois no inf.-dir.<br>Quadrilátero: clique nos 4 cantos, na ordem topo-esq. → topo-dir. → baixo-dir. → baixo-esq.</p>
+      <button class="bloco-btn" id="btnResetMarcacao">↺ Reiniciar marcação</button>
+    </div>
+
+    <div class="bloco">
+      <h2>2. Calibração detectada</h2>
+      <div id="tileLabel">—</div>
+      <div id="tilesDimInfo" style="margin-top:6px;"></div>
+      <button class="bloco-btn" id="btnPopupDim" disabled>📐 Ver dimensões-alvo</button>
+      <button class="bloco-btn" id="btnSalvarTxt" disabled>💾 Salvar .txt</button>
+    </div>
+
+    <div class="bloco">
+      <h2>3. Alinhamento da grade</h2>
+      <p class="ajuda">Se a grade da prévia não coincidir com o grid real do mapa, alinhe aqui antes de cortar (arraste a imagem ou use as setas).</p>
+      <button class="bloco-btn" id="btnAlinhamento" disabled>🎯 Ativar alinhamento (arraste a grade)</button>
+      <div class="cruz">
+        <div></div><button id="btnUp">↑</button><div></div>
+        <button id="btnLeft">←</button><div></div><button id="btnRight">→</button>
+        <div></div><button id="btnDown">↓</button><div></div>
+      </div>
+      <div id="offsetLabel" style="text-align:center;">Deslocamento: 0px, 0px</div>
+      <button class="bloco-btn" id="btnResetAlinhamento">↺ Redefinir alinhamento</button>
+    </div>
+
+    <div class="bloco">
+      <h2>4. Corte do excedente</h2>
+      <div class="linha">
+        <label class="rotulo">Largura:</label>
+        <select id="ladoW"><option value="direita">direita</option><option value="esquerda">esquerda</option><option value="ambos">ambos</option></select>
+      </div>
+      <div class="linha">
+        <label class="rotulo">Altura:</label>
+        <select id="ladoH"><option value="baixo">baixo</option><option value="cima">cima</option><option value="ambos">ambos</option></select>
+      </div>
+      <button class="bloco-btn" id="btnPreview" disabled>👁 Pré-visualizar corte</button>
+      <div id="corteInfo" style="margin-top:6px;"></div>
+    </div>
+
+    <div class="bloco">
+      <h2>5. Exportar</h2>
+      <p class="ajuda">Exporta a imagem cortada na resolução original (sem redimensionar) e, junto, um .txt com as dimensões finais para 50/70/100px por tile.</p>
+      <div class="linha">
+        <label class="rotulo">Formato:</label>
+        <select id="formatoSaida"><option value="png">PNG</option><option value="jpeg">JPG</option><option value="webp">WebP</option></select>
+      </div>
+      <button class="primario" id="btnExportar" disabled style="margin-top:6px;">💾 Exportar (resolução original + .txt)</button>
+    </div>
+
+    <div id="statusMsg"></div>
+  </div>
+</main>
+
+<footer>Roda 100% no seu navegador — nenhuma imagem é enviada a servidor algum.</footer>
+
+<script async src="https://docs.opencv.org/4.9.0/opencv.js" onload="onOpenCvReady()" onerror="onOpenCvError()"></script>
+<script>
+// ══════════════════════════════════════════════════════════════════
+// ESTADO
+// ══════════════════════════════════════════════════════════════════
+let cvPronto = false;
+function onOpenCvReady(){
+  cvPronto = true;
+  document.getElementById('cvStatus').textContent = '';
+}
+function onOpenCvError(){
+  document.getElementById('cvStatus').textContent = '(indisponível)';
+}
+
+let nomeArquivo = 'mapa';
+let extEntrada = 'png';
+let larguraOrig = 0, alturaOrig = 0;
+let canvasOriginal = document.createElement('canvas');   // imagem original em resolução real
+let canvasCorrigida = document.createElement('canvas');  // após homografia (ou igual à original)
+let tilePx = null;
+let offsetX = 0, offsetY = 0;
+let alinhamentoAtivo = false;
+let infoCorte = null;
+
+let scale = 1, scaleAjuste = 1, zoom = 1;
+let imagemBaseAtual = null; // canvas atualmente exibido (com overlay de grade já "assado", se houver)
+let pontosOriginais = [];       // marcação (dois_pontos / quadrilátero), em coords da imagem original
+let arrasteInicio = null;       // {x,y} em coords de canvas (modo quadrado)
+let arrasteAlinhamentoInicio = null;
+let retanguloAtualCanvas = null; // {x0,y0,x1,y1} pra desenhar durante drag
+
+const viewCanvas = document.getElementById('viewCanvas');
+const ctx = viewCanvas.getContext('2d');
+const canvasWrap = document.querySelector('.canvas-wrap');
+
+// ══════════════════════════════════════════════════════════════════
+// UTILITÁRIOS
+// ══════════════════════════════════════════════════════════════════
+function statusMsg(txt){ document.getElementById('statusMsg').textContent = txt; }
+
+function canvasParaOriginal(cx, cy){ return { x: cx/scale, y: cy/scale }; }
+function originalParaCanvas(ox, oy){ return { x: ox*scale, y: oy*scale }; }
+
+function posCanvas(evt){
+  const r = viewCanvas.getBoundingClientRect();
+  return { x: evt.clientX - r.left, y: evt.clientY - r.top };
+}
+
+// ══════════════════════════════════════════════════════════════════
+// ABERTURA DE IMAGEM
+// ══════════════════════════════════════════════════════════════════
+document.getElementById('fileInput').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const img = new Image();
+  img.onload = ()=>{
+    nomeArquivo = file.name.replace(/\.[^.]+$/, '');
+    extEntrada = (file.name.split('.').pop()||'png').toLowerCase();
+    larguraOrig = img.naturalWidth;
+    alturaOrig = img.naturalHeight;
+
+    canvasOriginal.width = larguraOrig; canvasOriginal.height = alturaOrig;
+    canvasOriginal.getContext('2d').drawImage(img, 0, 0);
+    canvasCorrigida.width = larguraOrig; canvasCorrigida.height = alturaOrig;
+    canvasCorrigida.getContext('2d').drawImage(img, 0, 0);
+
+    tilePx = null; infoCorte = null; offsetX = 0; offsetY = 0;
+    alinhamentoAtivo = false; pontosOriginais = []; zoom = 1;
+    document.getElementById('btnAlinhamento').textContent = '🎯 Ativar alinhamento (arraste a grade)';
+    document.getElementById('btnAlinhamento').disabled = true;
+    document.getElementById('btnPreview').disabled = true;
+    document.getElementById('btnExportar').disabled = true;
+    document.getElementById('btnPopupDim').disabled = true;
+    document.getElementById('btnSalvarTxt').disabled = true;
+    document.getElementById('tileLabel').textContent = '—';
+    document.getElementById('tilesDimInfo').textContent = '';
+    document.getElementById('corteInfo').textContent = '';
+    document.getElementById('offsetLabel').textContent = 'Deslocamento: 0px, 0px';
+    statusMsg('');
+
+    document.getElementById('instrucao').textContent =
+      `Arquivo: ${file.name} | ${larguraOrig}×${alturaOrig}px. Marque 1 tile do grid no modo escolhido à direita.`;
+
+    exibirNoCanvas(canvasCorrigida);
+  };
+  img.src = URL.createObjectURL(file);
+});
+
+// ══════════════════════════════════════════════════════════════════
+// EXIBIÇÃO / ZOOM
+// ══════════════════════════════════════════════════════════════════
+function exibirNoCanvas(sourceCanvas){
+  imagemBaseAtual = sourceCanvas;
+  const maxW = 900, maxH = 620;
+  scaleAjuste = Math.min(maxW/sourceCanvas.width, maxH/sourceCanvas.height, 1);
+  scale = scaleAjuste * zoom;
+  const dispW = Math.max(1, Math.round(sourceCanvas.width*scale));
+  const dispH = Math.max(1, Math.round(sourceCanvas.height*scale));
+  viewCanvas.width = dispW; viewCanvas.height = dispH;
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(sourceCanvas, 0, 0, sourceCanvas.width, sourceCanvas.height, 0, 0, dispW, dispH);
+  document.getElementById('zoomLabel').textContent = Math.round(zoom*100)+'%';
+  redesenharMarcacoes();
+}
+
+function aplicarZoom(novoZoom){
+  zoom = Math.max(0.2, Math.min(novoZoom, 8));
+  exibirNoCanvas(imagemBaseAtual || canvasCorrigida);
+}
+
+document.getElementById('btnZoomIn').onclick = ()=>aplicarZoom(zoom*1.25);
+document.getElementById('btnZoomOut').onclick = ()=>aplicarZoom(zoom/1.25);
+document.getElementById('btnZoomAjustar').onclick = ()=>aplicarZoom(1.0);
+viewCanvas.addEventListener('wheel', (e)=>{
+  if(larguraOrig===0) return;
+  e.preventDefault();
+  aplicarZoom(e.deltaY < 0 ? zoom*1.1 : zoom/1.1);
+}, {passive:false});
+
+// ══════════════════════════════════════════════════════════════════
+// MARCAÇÃO / REDESENHO DE OVERLAY
+// ══════════════════════════════════════════════════════════════════
+function modoAtual(){
+  return document.querySelector('input[name="modo"]:checked').value;
+}
+
+function resetarMarcacao(){
+  pontosOriginais = [];
+  arrasteInicio = null;
+  retanguloAtualCanvas = null;
+  redesenharMarcacoes();
+}
+document.getElementById('btnResetMarcacao').onclick = resetarMarcacao;
+document.querySelectorAll('input[name="modo"]').forEach(r=> r.addEventListener('change', resetarMarcacao));
+
+function redesenharMarcacoes(){
+  // Redesenha a imagem base (sem apagar o que já foi feito por exibirNoCanvas) -- aqui só sobrepõe overlay
+  // (exibirNoCanvas já desenhou a imagem; esta função assume que é chamada logo em seguida)
+  const cor = '#EA8C1F';
+  ctx.strokeStyle = cor; ctx.fillStyle = cor; ctx.lineWidth = 2;
+
+  if(retanguloAtualCanvas){
+    const r = retanguloAtualCanvas;
+    ctx.strokeRect(Math.min(r.x0,r.x1), Math.min(r.y0,r.y1), Math.abs(r.x1-r.x0), Math.abs(r.y1-r.y0));
+  }
+  const pontosCanvas = pontosOriginais.map(p=>originalParaCanvas(p.x,p.y));
+  pontosCanvas.forEach(p=>{
+    ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI*2); ctx.fill();
+  });
+  if(modoAtual()==='dois_pontos' && pontosCanvas.length===2){
+    const [a,b] = pontosCanvas;
+    ctx.strokeRect(Math.min(a.x,b.x), Math.min(a.y,b.y), Math.abs(b.x-a.x), Math.abs(b.y-a.y));
+  } else if(modoAtual()==='reta' && pontosCanvas.length===2){
+    const [a,b] = pontosCanvas;
+    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+  } else if(modoAtual()==='quadrilatero'){
+    for(let i=1;i<pontosCanvas.length;i++){
+      ctx.beginPath(); ctx.moveTo(pontosCanvas[i-1].x,pontosCanvas[i-1].y);
+      ctx.lineTo(pontosCanvas[i].x,pontosCanvas[i].y); ctx.stroke();
+    }
+    if(pontosCanvas.length===4){
+      ctx.beginPath(); ctx.moveTo(pontosCanvas[3].x,pontosCanvas[3].y);
+      ctx.lineTo(pontosCanvas[0].x,pontosCanvas[0].y); ctx.stroke();
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// EVENTOS DE MOUSE NO CANVAS
+// ══════════════════════════════════════════════════════════════════
+viewCanvas.addEventListener('mousedown', (e)=>{
+  if(larguraOrig===0) return;
+  const p = posCanvas(e);
+  if(alinhamentoAtivo){ arrasteAlinhamentoInicio = p; return; }
+  if(modoAtual()==='quadrado'){
+    arrasteInicio = p; retanguloAtualCanvas = null;
+  }
+});
+
+viewCanvas.addEventListener('mousemove', (e)=>{
+  if(larguraOrig===0) return;
+  const p = posCanvas(e);
+  if(alinhamentoAtivo){
+    if(!arrasteAlinhamentoInicio) return;
+    const dxOrig = (p.x - arrasteAlinhamentoInicio.x)/scale;
+    const dyOrig = (p.y - arrasteAlinhamentoInicio.y)/scale;
+    arrasteAlinhamentoInicio = p;
+    offsetX += dxOrig; offsetY += dyOrig;
+    redesenharGradeAlinhamento();
+    return;
+  }
+  if(modoAtual()==='quadrado' && arrasteInicio){
+    const dx = p.x - arrasteInicio.x, dy = p.y - arrasteInicio.y;
+    const lado = Math.max(Math.abs(dx), Math.abs(dy));
+    const sx = dx>=0?1:-1, sy = dy>=0?1:-1;
+    retanguloAtualCanvas = { x0: arrasteInicio.x, y0: arrasteInicio.y,
+                              x1: arrasteInicio.x+sx*lado, y1: arrasteInicio.y+sy*lado };
+    exibirNoCanvas(canvasCorrigida);
+  }
+});
+
+viewCanvas.addEventListener('mouseup', (e)=>{
+  if(larguraOrig===0) return;
+  if(alinhamentoAtivo){ arrasteAlinhamentoInicio = null; return; }
+  const p = posCanvas(e);
+  const modo = modoAtual();
+
+  if(modo==='dois_pontos'){
+    if(pontosOriginais.length>=2) return;
+    pontosOriginais.push(canvasParaOriginal(p.x,p.y));
+    exibirNoCanvas(canvasCorrigida);
+    if(pontosOriginais.length===2){
+      const [a,b] = pontosOriginais;
+      const lado = Math.max(Math.abs(b.x-a.x), Math.abs(b.y-a.y));
+      finalizarCalibracaoQuadrado(lado);
+    }
+    return;
+  }
+
+  if(modo==='reta'){
+    if(pontosOriginais.length>=2) return;
+    pontosOriginais.push(canvasParaOriginal(p.x,p.y));
+    exibirNoCanvas(canvasCorrigida);
+    if(pontosOriginais.length===2) finalizarCalibracaoReta();
+    return;
+  }
+
+  if(modo==='quadrado'){
+    if(!arrasteInicio) return;
+    const dx = p.x - arrasteInicio.x, dy = p.y - arrasteInicio.y;
+    const lado = Math.max(Math.abs(dx), Math.abs(dy));
+    arrasteInicio = null;
+    if(lado<4){ retanguloAtualCanvas=null; exibirNoCanvas(canvasCorrigida); return; }
+    const p0 = canvasParaOriginal(retanguloAtualCanvas.x0, retanguloAtualCanvas.y0);
+    const p1 = canvasParaOriginal(retanguloAtualCanvas.x1, retanguloAtualCanvas.y1);
+    finalizarCalibracaoQuadrado(Math.abs(p1.x-p0.x));
+    return;
+  }
+
+  if(modo==='quadrilatero'){
+    if(pontosOriginais.length>=4) return;
+    pontosOriginais.push(canvasParaOriginal(p.x,p.y));
+    exibirNoCanvas(canvasCorrigida);
+    if(pontosOriginais.length===4) finalizarCalibracaoQuadrilatero();
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════
+// CALIBRAÇÃO
+// ══════════════════════════════════════════════════════════════════
+function finalizarCalibracaoQuadrado(lado){
+  canvasCorrigida.width = larguraOrig; canvasCorrigida.height = alturaOrig;
+  canvasCorrigida.getContext('2d').drawImage(canvasOriginal, 0, 0);
+  tilePx = lado;
+  mostrarResultadoCalibracao();
+}
+
+function finalizarCalibracaoReta(){
+  const [p0, p1] = pontosOriginais;
+  const distancia = Math.hypot(p1.x-p0.x, p1.y-p0.y);
+
+  const resposta = prompt(
+    'Quantas células do grid a reta marcada abrange?\n' +
+    '(ex: se você clicou do início ao fim de 10 células seguidas, digite 10)',
+    '10'
+  );
+  const nTiles = parseInt(resposta, 10);
+  if(!resposta || !nTiles || nTiles < 1){
+    resetarMarcacao();
+    statusMsg('Calibração por reta cancelada.');
+    return;
+  }
+
+  const tile = distancia / nTiles;
+  finalizarCalibracaoQuadrado(tile);
+  statusMsg(`Reta de ${distancia.toFixed(1)}px ÷ ${nTiles} tiles = ${tile.toFixed(2)}px por tile.`);
+}
+
+function finalizarCalibracaoQuadrilatero(){
+  if(!cvPronto){
+    statusMsg('OpenCV ainda carregando, tente novamente em instantes.');
+    pontosOriginais = []; exibirNoCanvas(canvasCorrigida);
+    return;
+  }
+  statusMsg('Corrigindo perspectiva...');
+  const pts = pontosOriginais;
+  const lados = [
+    Math.hypot(pts[1].x-pts[0].x, pts[1].y-pts[0].y),
+    Math.hypot(pts[2].x-pts[1].x, pts[2].y-pts[1].y),
+    Math.hypot(pts[2].x-pts[3].x, pts[2].y-pts[3].y),
+    Math.hypot(pts[3].x-pts[0].x, pts[3].y-pts[0].y),
+  ];
+  const ladoMedio = lados.reduce((a,b)=>a+b,0)/4;
+  const origem = pts[0];
+  const destino = [
+    origem,
+    {x: origem.x+ladoMedio, y: origem.y},
+    {x: origem.x+ladoMedio, y: origem.y+ladoMedio},
+    {x: origem.x, y: origem.y+ladoMedio},
+  ];
+
+  const src = cv.imread(canvasOriginal);
+  const srcPts = cv.matFromArray(4,1,cv.CV_32FC2, [
+    pts[0].x,pts[0].y, pts[1].x,pts[1].y, pts[2].x,pts[2].y, pts[3].x,pts[3].y
+  ]);
+  const dstPts = cv.matFromArray(4,1,cv.CV_32FC2, [
+    destino[0].x,destino[0].y, destino[1].x,destino[1].y, destino[2].x,destino[2].y, destino[3].x,destino[3].y
+  ]);
+  const M = cv.getPerspectiveTransform(srcPts, dstPts);
+  const dst = new cv.Mat();
+  const dsize = new cv.Size(larguraOrig, alturaOrig);
+  cv.warpPerspective(src, dst, M, dsize, cv.INTER_LANCZOS4, cv.BORDER_REPLICATE);
+
+  canvasCorrigida.width = larguraOrig; canvasCorrigida.height = alturaOrig;
+  cv.imshow(canvasCorrigida, dst);
+  src.delete(); dst.delete(); M.delete(); srcPts.delete(); dstPts.delete();
+
+  tilePx = ladoMedio;
+  exibirNoCanvas(canvasCorrigida);
+  mostrarResultadoCalibracao();
+}
+
+function mostrarResultadoCalibracao(){
+  offsetX = 0; offsetY = 0; alinhamentoAtivo = false;
+  document.getElementById('btnAlinhamento').textContent = '🎯 Ativar alinhamento (arraste a grade)';
+  document.getElementById('btnAlinhamento').disabled = false;
+  document.getElementById('btnPreview').disabled = false;
+  document.getElementById('btnExportar').disabled = false;
+  document.getElementById('btnPopupDim').disabled = false;
+  document.getElementById('btnSalvarTxt').disabled = false;
+  atualizarInfoCorte();
+  statusMsg('Calibração concluída. Ajuste o alinhamento/corte e exporte.');
+}
+
+// ══════════════════════════════════════════════════════════════════
+// CÁLCULO DE CORTE (espelha a lógica do programa Python)
+// ══════════════════════════════════════════════════════════════════
+function calcularCorte(largura, altura, tile, offX, offY, ladoW, ladoH){
+  function eixo(tamanho, offset, ladoPref, nomeA, nomeB){
+    const alinhado = Math.abs(offset) > 1e-6;
+    let tiles, corteA, corteB;
+    if(alinhado){
+      offset = ((offset % tile) + tile) % tile;
+      tiles = Math.floor((tamanho-offset)/tile);
+      corteA = Math.round(offset);
+      corteB = Math.round(tamanho - corteA - tiles*tile);
+      if(corteB<0) corteB=0;
+    } else {
+      tiles = Math.floor(tamanho/tile);
+      const sobra = Math.round(tamanho - tiles*tile);
+      if(sobra<=0){ corteA=0; corteB=0; }
+      else if(ladoPref===nomeA){ corteA=sobra; corteB=0; }
+      else if(ladoPref===nomeB){ corteA=0; corteB=sobra; }
+      else { corteA = Math.floor(sobra/2); corteB = sobra-corteA; }
+    }
+    return {tiles, corteA, corteB, alinhado};
+  }
+  const w = eixo(largura, offX, ladoW, 'esquerda', 'direita');
+  const h = eixo(altura, offY, ladoH, 'cima', 'baixo');
+  return {
+    tilesW: w.tiles, tilesH: h.tiles,
+    corteEsquerda: w.corteA, corteDireita: w.corteB,
+    corteTopo: h.corteA, corteBaixo: h.corteB,
+    alinhadoW: w.alinhado, alinhadoH: h.alinhado,
+  };
+}
+
+function aplicarCorte(sourceCanvas, info){
+  const left = info.corteEsquerda, top = info.corteTopo;
+  const right = sourceCanvas.width - info.corteDireita;
+  const bottom = sourceCanvas.height - info.corteBaixo;
+  const w = right-left, h = bottom-top;
+  const out = document.createElement('canvas');
+  out.width = w; out.height = h;
+  out.getContext('2d').drawImage(sourceCanvas, left, top, w, h, 0, 0, w, h);
+  return out;
+}
+
+function desenharGradeOverlay(sourceCanvas, tile, offX=0, offY=0){
+  const out = document.createElement('canvas');
+  out.width = sourceCanvas.width; out.height = sourceCanvas.height;
+  const c = out.getContext('2d');
+  c.drawImage(sourceCanvas,0,0);
+  c.strokeStyle = '#FF3C3C'; c.lineWidth = 1;
+  const passo = Math.max(1, tile);
+  let ox = ((offX % passo)+passo)%passo, oy = ((offY % passo)+passo)%passo;
+  for(let x=ox; x<=out.width; x+=passo){
+    c.beginPath(); c.moveTo(Math.round(x),0); c.lineTo(Math.round(x),out.height); c.stroke();
+  }
+  for(let y=oy; y<=out.height; y+=passo){
+    c.beginPath(); c.moveTo(0,Math.round(y)); c.lineTo(out.width,Math.round(y)); c.stroke();
+  }
+  return out;
+}
+
+function atualizarInfoCorte(){
+  if(tilePx===null) return;
+  infoCorte = calcularCorte(larguraOrig, alturaOrig, tilePx, offsetX, offsetY,
+                             document.getElementById('ladoW').value, document.getElementById('ladoH').value);
+  const dims = [50,70,100].map(t=>({t, w: infoCorte.tilesW*t, h: infoCorte.tilesH*t}));
+  window._dimensoesAlvo = dims;
+
+  document.getElementById('tileLabel').textContent = `1 tile ≈ ${tilePx.toFixed(2)} px`;
+  document.getElementById('tilesDimInfo').textContent =
+    `Imagem: ${larguraOrig}×${alturaOrig}px\n` +
+    `Tiles inteiros: ${infoCorte.tilesW} × ${infoCorte.tilesH}\n` +
+    `Dimensões finais:\n` + dims.map(d=>`  • ${d.t}px/tile → ${d.w}×${d.h}px`).join('\n');
+
+  const origemW = infoCorte.alinhadoW ? 'alinhamento' : `escolha manual (${document.getElementById('ladoW').value})`;
+  const origemH = infoCorte.alinhadoH ? 'alinhamento' : `escolha manual (${document.getElementById('ladoH').value})`;
+  document.getElementById('corteInfo').textContent =
+    `Corte definido por: largura → ${origemW}, altura → ${origemH}\n` +
+    `Esquerda: ${infoCorte.corteEsquerda}px   Direita: ${infoCorte.corteDireita}px\n` +
+    `Topo: ${infoCorte.corteTopo}px   Baixo: ${infoCorte.corteBaixo}px\n` +
+    `O corte preserva sempre o último tile inteiro de cada lado.`;
+
+  if(alinhamentoAtivo){
+    document.getElementById('offsetLabel').textContent = `Deslocamento: ${offsetX.toFixed(1)}px, ${offsetY.toFixed(1)}px`;
+  }
+}
+document.getElementById('ladoW').addEventListener('change', atualizarInfoCorte);
+document.getElementById('ladoH').addEventListener('change', atualizarInfoCorte);
+
+// ══════════════════════════════════════════════════════════════════
+// ALINHAMENTO
+// ══════════════════════════════════════════════════════════════════
+function redesenharGradeAlinhamento(){
+  const preview = desenharGradeOverlay(canvasCorrigida, tilePx, offsetX, offsetY);
+  exibirNoCanvas(preview);
+  document.getElementById('offsetLabel').textContent = `Deslocamento: ${offsetX.toFixed(1)}px, ${offsetY.toFixed(1)}px`;
+  atualizarInfoCorte();
+}
+
+document.getElementById('btnAlinhamento').onclick = ()=>{
+  if(tilePx===null) return;
+  alinhamentoAtivo = !alinhamentoAtivo;
+  if(alinhamentoAtivo){
+    document.getElementById('btnAlinhamento').textContent = '✅ Alinhamento ativo (clique p/ concluir)';
+    zoom = 1;
+    redesenharGradeAlinhamento();
+  } else {
+    document.getElementById('btnAlinhamento').textContent = '🎯 Ativar alinhamento (arraste a grade)';
+    exibirNoCanvas(canvasCorrigida);
+    atualizarInfoCorte();
+    statusMsg('Alinhamento concluído. Confira o corte abaixo.');
+  }
+};
+
+function nudge(dx,dy){
+  if(tilePx===null) return;
+  if(!alinhamentoAtivo){
+    alinhamentoAtivo = true;
+    document.getElementById('btnAlinhamento').textContent = '✅ Alinhamento ativo (clique p/ concluir)';
+  }
+  offsetX += dx; offsetY += dy;
+  redesenharGradeAlinhamento();
+}
+document.getElementById('btnUp').onclick = ()=>nudge(0,-1);
+document.getElementById('btnDown').onclick = ()=>nudge(0,1);
+document.getElementById('btnLeft').onclick = ()=>nudge(-1,0);
+document.getElementById('btnRight').onclick = ()=>nudge(1,0);
+document.getElementById('btnResetAlinhamento').onclick = ()=>{
+  offsetX = 0; offsetY = 0;
+  if(alinhamentoAtivo) redesenharGradeAlinhamento(); else atualizarInfoCorte();
+};
+
+// ══════════════════════════════════════════════════════════════════
+// PRÉVIA DE CORTE
+// ══════════════════════════════════════════════════════════════════
+document.getElementById('btnPreview').onclick = ()=>{
+  if(tilePx===null) return;
+  if(alinhamentoAtivo){
+    alinhamentoAtivo = false;
+    document.getElementById('btnAlinhamento').textContent = '🎯 Ativar alinhamento (arraste a grade)';
+  }
+  atualizarInfoCorte();
+  const cortada = aplicarCorte(canvasCorrigida, infoCorte);
+  const preview = desenharGradeOverlay(cortada, tilePx);
+  zoom = 1;
+  exibirNoCanvas(preview);
+  statusMsg(`Prévia do corte (${cortada.width}×${cortada.height}px) com grade de ${tilePx.toFixed(1)}px. Exporte quando estiver satisfeito.`);
+};
+
+// ══════════════════════════════════════════════════════════════════
+// DIMENSÕES-ALVO (popup / txt)
+// ══════════════════════════════════════════════════════════════════
+function textoDimensoesAlvo(){
+  if(!window._dimensoesAlvo || !infoCorte) return null;
+  const linhas = [
+    'Calibrador de Mapas de RPG — Dimensões-alvo',
+    `Arquivo: ${nomeArquivo}.${extEntrada}`,
+    `Tile calibrado: ${tilePx.toFixed(2)} px`,
+    `Dimensão original (após correção, se aplicável): ${larguraOrig}×${alturaOrig}px`,
+    `Tiles inteiros: ${infoCorte.tilesW} × ${infoCorte.tilesH}`,
+    `Corte: esquerda ${infoCorte.corteEsquerda}px / direita ${infoCorte.corteDireita}px / topo ${infoCorte.corteTopo}px / baixo ${infoCorte.corteBaixo}px`,
+    '',
+    'Dimensões finais para cada padrão de tile (após cortar o excedente e redimensionar):',
+    ...window._dimensoesAlvo.map(d=>`  ${d.t}px por tile  →  ${d.w} x ${d.h} px`),
+    '',
+    'Se preferir manter a imagem no tamanho original e ajustar depois em outro',
+    'editor ou IA, use estas dimensões como referência final para cada padrão.',
+  ];
+  return linhas.join('\n');
+}
+
+document.getElementById('btnPopupDim').onclick = ()=>{
+  const t = textoDimensoesAlvo();
+  if(!t){ alert('Calibre o tile primeiro.'); return; }
+  alert(t);
+};
+
+function baixarArquivo(nome, blob){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = nome;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+document.getElementById('btnSalvarTxt').onclick = ()=>{
+  const t = textoDimensoesAlvo();
+  if(!t){ alert('Calibre o tile primeiro.'); return; }
+  baixarArquivo(`${nomeArquivo}_dimensoes.txt`, new Blob([t], {type:'text/plain'}));
+  statusMsg('Dimensões salvas (verifique a pasta de downloads).');
+};
+
+// ══════════════════════════════════════════════════════════════════
+// EXPORTAÇÃO
+// ══════════════════════════════════════════════════════════════════
+document.getElementById('btnExportar').onclick = ()=>{
+  if(tilePx===null) return;
+  if(alinhamentoAtivo){
+    alinhamentoAtivo = false;
+    document.getElementById('btnAlinhamento').textContent = '🎯 Ativar alinhamento (arraste a grade)';
+  }
+  atualizarInfoCorte();
+  const cortada = aplicarCorte(canvasCorrigida, infoCorte);
+
+  const formato = document.getElementById('formatoSaida').value; // png | jpeg | webp
+  const extSaida = formato==='jpeg' ? 'jpg' : formato;
+  const mime = 'image/'+formato;
+  const qualidade = formato==='png' ? undefined : 0.92;
+
+  cortada.toBlob((blob)=>{
+    baixarArquivo(`${nomeArquivo}_cortado.${extSaida}`, blob);
+    const t = textoDimensoesAlvo();
+    if(t) baixarArquivo(`${nomeArquivo}_dimensoes.txt`, new Blob([t], {type:'text/plain'}));
+    statusMsg('Exportado! Verifique a pasta de downloads do navegador.');
+  }, mime, qualidade);
+};
+</script>
+</body>
+</html>
