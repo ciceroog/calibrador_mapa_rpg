@@ -8,7 +8,8 @@ de tile — pronto para redimensionar para **50×50**, **70×70** ou
 Roda inteiramente no navegador — nenhuma imagem é enviada a servidor
 algum. Suporta JPG, JPEG, PNG e WebP.
 
-🔗 **Acesse aqui:** `https://ciceroog.github.io/calibrador-mapa-rpg/`
+🔗 **Acesse aqui:** `https://SEU-USUARIO.github.io/calibrador-mapa-rpg/`
+*(substitua pelo link do seu GitHub Pages depois de publicar)*
 
 ---
 
@@ -16,19 +17,23 @@ algum. Suporta JPG, JPEG, PNG e WebP.
 
 1. [O que a ferramenta faz](#o-que-a-ferramenta-faz)
 2. [Como usar](#como-usar)
-3. [Modos de calibração](#modos-de-calibração)
-4. [Alinhamento da grade](#alinhamento-da-grade)
-5. [Corte do excedente](#corte-do-excedente)
-6. [O que é exportado](#o-que-é-exportado)
-7. [Privacidade](#privacidade)
-8. [Limitações conhecidas](#limitações-conhecidas)
-9. [Rodando localmente / publicando](#rodando-localmente--publicando)
+3. [Detecção automática](#detecção-automática)
+4. [Modos de calibração](#modos-de-calibração)
+5. [Alinhamento da grade](#alinhamento-da-grade)
+6. [Corte do excedente](#corte-do-excedente)
+7. [O que é exportado](#o-que-é-exportado)
+8. [Privacidade](#privacidade)
+9. [Limitações conhecidas](#limitações-conhecidas)
+10. [Rodando localmente / publicando](#rodando-localmente--publicando)
 
 ---
 
 ## O que a ferramenta faz
 
 - Abre um mapa (JPG, JPEG, PNG ou WebP) direto no navegador
+- **Detecta automaticamente** um palpite do tamanho do tile e sugere uma
+  área "limpa" do mapa para calibrar — sem precisar marcar nada
+  manualmente antes (veja [Detecção automática](#detecção-automática))
 - Permite dar **zoom** na imagem para marcar com precisão mesmo em
   imagens pequenas
 - Permite marcar o tamanho de **1 tile** do grid do mapa, de 3 formas:
@@ -68,6 +73,45 @@ algum. Suporta JPG, JPEG, PNG e WebP.
    conferir antes de exportar.
 7. Escolha o formato e clique em **"💾 Exportar"** — dois arquivos serão
    baixados: a imagem cortada e o `.txt` com as dimensões-alvo.
+
+---
+
+## Detecção automática
+
+Antes de marcar qualquer coisa manualmente, clique em
+**"🪄 Detectar automaticamente"** (topo do bloco "1. Modo de
+calibração"). A ferramenta analisa a imagem inteira, no seu navegador, e:
+
+1. Estima o tamanho do tile em pixels, procurando o padrão que mais se
+   repete nas bordas da imagem (as linhas do grid formam um padrão
+   periódico — a técnica usada é autocorrelação, o mesmo princípio usado
+   para detectar periodicidade em sinais de áudio e imagem, sem
+   nenhuma IA/machine learning envolvida). O gradiente de bordas é
+   calculado com OpenCV.js (já carregado para o modo "Quadrilátero"); a
+   autocorrelação em si é JavaScript puro.
+2. Sugere uma **área "limpa"** do mapa (marcada com um retângulo azul
+   tracejado) — a região onde esse padrão aparece de forma mais nítida,
+   evitando ícones, textos e móveis que atrapalham a detecção.
+
+O resultado aparece como "Tile estimado: ~XX.Xpx (confiança: alta/média/baixa)".
+Você pode:
+- Clicar em **"✅ Usar esta sugestão"** para aceitar a estimativa direto,
+  sem marcar nada manualmente; ou
+- Usar a área azul sugerida como referência visual para calibrar
+  manualmente ali com qualquer um dos modos abaixo — especialmente o
+  modo **"Reta"**, que combina bem com essa sugestão (a área sugerida
+  já tem o tamanho de ~8 tiles, então dá pra usar os cantos dela como
+  referência para uma reta de 8 tiles).
+
+**Sobre a confiança**: "alta" indica um padrão bem definido e
+consistente; "baixa" pode significar um mapa sem grid visível, textura
+de fundo muito repetitiva competindo com o grid, ou uma imagem pequena
+demais para uma boa amostragem. Nesses casos, prefira calibrar
+manualmente.
+
+> Como todo processamento roda no seu navegador, imagens muito grandes
+> podem levar 1-2 segundos para a análise — a ferramenta mostra
+> "Analisando periodicidade do grid..." enquanto processa.
 
 ---
 
