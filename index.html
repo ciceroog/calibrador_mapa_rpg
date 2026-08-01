@@ -283,6 +283,7 @@ let alinhamentoAtivo = false;
 let infoCorte = null;
 
 let scale = 1, scaleAjuste = 1, zoom = 1;
+let imagemBaseAtual = null; // canvas atualmente exibido (com overlay de grade já "assado", se houver)
 let pontosOriginais = [];       // marcação (dois_pontos / quadrilátero), em coords da imagem original
 let arrasteInicio = null;       // {x,y} em coords de canvas (modo quadrado)
 let arrasteAlinhamentoInicio = null;
@@ -349,6 +350,7 @@ document.getElementById('fileInput').addEventListener('change', (e)=>{
 // EXIBIÇÃO / ZOOM
 // ══════════════════════════════════════════════════════════════════
 function exibirNoCanvas(sourceCanvas){
+  imagemBaseAtual = sourceCanvas;
   const maxW = 900, maxH = 620;
   scaleAjuste = Math.min(maxW/sourceCanvas.width, maxH/sourceCanvas.height, 1);
   scale = scaleAjuste * zoom;
@@ -363,10 +365,7 @@ function exibirNoCanvas(sourceCanvas){
 
 function aplicarZoom(novoZoom){
   zoom = Math.max(0.2, Math.min(novoZoom, 8));
-  exibirNoCanvas(alinhamentoAtivo ? canvasCorrigida : (ultimaImagemExibida()));
-}
-function ultimaImagemExibida(){
-  return canvasCorrigida;
+  exibirNoCanvas(imagemBaseAtual || canvasCorrigida);
 }
 
 document.getElementById('btnZoomIn').onclick = ()=>aplicarZoom(zoom*1.25);
