@@ -8,7 +8,7 @@ de tile — pronto para redimensionar para **50×50**, **70×70** ou
 Roda inteiramente no navegador — nenhuma imagem é enviada a servidor
 algum. Suporta JPG, JPEG, PNG e WebP.
 
-🔗 **Acesse aqui:** `https://ciceroog.github.io/calibrador-mapa-rpg/`
+🔗 **Acesse aqui:** `[https://ciceroog.github.io/calibrador-mapa-rpg/](https://ciceroog.github.io/calibrador_mapa_rpg/)`
 
 ---
 
